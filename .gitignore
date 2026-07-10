@@ -17,6 +17,7 @@ files/
 __pycache__/
 .DS_Store
 .env
+.hh
 .env.local
 .env.development.local
 .env.test.local
