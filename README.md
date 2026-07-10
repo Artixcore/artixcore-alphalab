@@ -7,7 +7,7 @@ Built with: **ALI 1.0.0**
 Organization: **Artixcore**  
 Project Type: **AI / Quant Research / Machine Learning Competition Prototype**  
 Competition Target: **AlphaNova Competition 5  Walk-Forward Cross-Sectional Signal Forecasting**  
-Status: **Portfolio-grade research prototype**
+Status: **Portfolio-grade research prototype** — local venv smoke test passing; AlphaNova official validation pending
 
 ---
 
@@ -250,14 +250,27 @@ The submission should satisfy the following requirements:
 
 ---
 
-## 8. Expected File Structure
+## 8. Repository File Structure
 
-A clean repository may look like this:
+### 8.1 Current repository (implemented)
 
 ```text
 artixcore-alphalab/
+├── .gitignore                 # ignores .venv/
 ├── README.md
-├── artixcore_alphalab_v01.py
+├── artixcore_alphalab_v01.py  # competition submission file (Predictor subclass)
+├── predictor.py               # local dev stub only (replace with AlphaNova SDK for real validation)
+├── requirements.txt           # numpy, pandas
+├── run_local.py               # local smoke test (synthetic train/predict)
+└── .venv/                     # local virtual environment (not committed)
+```
+
+**Submission rule:** Only `artixcore_alphalab_v01.py` is uploaded to AlphaNova. Keep all model logic inside that file. `predictor.py`, `run_local.py`, and `requirements.txt` exist for local development and are not part of the competition submission.
+
+### 8.2 Optional portfolio additions (not yet in repo)
+
+```text
+artixcore-alphalab/
 ├── reports/
 │   └── Artixcore_AlphaLab_v01_Research_Note.md
 ├── screenshots/
@@ -277,9 +290,137 @@ Do not publish AlphaNova's private competition dataset unless the competition ru
 
 ## 9. Local Validation
 
-Before submitting, the model should be tested with the official AlphaNova runner.
+### 9.1 Local venv smoke test (current repo)
 
-Recommended commands:
+Use this first to confirm imports, training, and prediction work on your machine before AlphaNova validation.
+
+**Requirements:** Python 3.11+ (tested on 3.14). If `pip install` fails, recreate the venv with Python 3.12.
+
+**Git Bash (Windows):**
+
+```bash
+cd artixcore-alphalab
+python -m venv .venv
+source .venv/Scripts/activate
+python -m pip install -U pip
+pip install -r requirements.txt
+python run_local.py
+```
+
+**PowerShell (Windows):**
+
+```powershell
+cd artixcore-alphalab
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+python -m pip install -U pip
+pip install -r requirements.txt
+python run_local.py
+```
+
+**Expected output:**
+
+```text
+is_trained_: True
+prediction shape: (20, 3)
+prediction head:
+asset           AAPL      MSFT      GOOG
+2020-04-10  0.283401  0.369604 -0.653005
+...
+```
+
+**Quick import check:**
+
+```bash
+python -c "from artixcore_alphalab_v01 import ArtixcoreAlphaLabPredictor; print(ArtixcoreAlphaLabPredictor())"
+```
+
+#### `requirements.txt`
+
+```text
+numpy>=2.0
+pandas>=2.2
+```
+
+#### `predictor.py` (local dev stub)
+
+AlphaNova provides `predictor.Predictor` in their competition toolkit. For offline development, the repo includes a minimal stub:
+
+```python
+class Predictor:
+    """Local dev stub for AlphaLab platform Predictor."""
+
+    pass
+```
+
+Replace or remove this stub when running inside the official AlphaNova runner environment.
+
+#### `run_local.py` (local smoke test)
+
+```python
+import numpy as np
+import pandas as pd
+
+from artixcore_alphalab_v01 import ArtixcoreAlphaLabPredictor
+
+
+def make_synthetic_panel(n_dates=120, seed=42):
+    rng = np.random.default_rng(seed)
+    index = pd.date_range("2020-01-01", periods=n_dates, freq="D")
+    tickers = ["AAPL", "MSFT", "GOOG"]
+
+    features = pd.DataFrame(
+        {ticker: rng.standard_normal(n_dates).astype(np.float32) for ticker in tickers},
+        index=index,
+    )
+    target = pd.DataFrame(
+        {
+            ticker: (
+                0.4 * features[ticker]
+                + 0.3 * features[ticker].shift(1)
+                + 0.1 * rng.standard_normal(n_dates)
+            ).astype(np.float32)
+            for ticker in tickers
+        },
+        index=index,
+    )
+    return features, target
+
+
+def main():
+    features, target = make_synthetic_panel()
+    train_features = features.iloc[:-20]
+    train_target = target.iloc[:-20]
+    predict_features = features.iloc[-20:]
+
+    model = ArtixcoreAlphaLabPredictor()
+    model.train(train_features, train_target)
+    predictions = model.predict(predict_features)
+
+    print(f"is_trained_: {model.is_trained_}")
+    if model.training_error_:
+        print(f"training_error_: {model.training_error_}")
+    print(f"prediction shape: {predictions.shape}")
+    print("prediction head:")
+    print(predictions.head())
+
+    if not model.is_trained_:
+        raise SystemExit(1)
+    if predictions.shape != predict_features.shape:
+        raise SystemExit(
+            f"unexpected prediction shape: {predictions.shape} vs {predict_features.shape}"
+        )
+
+
+if __name__ == "__main__":
+    main()
+```
+
+### 9.2 AlphaNova official validation (before submission)
+
+After local smoke tests pass, validate with AlphaNova's official runner and competition dataset.
+
+Recommended commands (from the AlphaNova toolkit directory):
 
 ```bash
 python runner.py artixcore_alphalab_v01.py
@@ -362,7 +503,8 @@ It is not about shouting that the model is unbeatable. It is about showing that 
 - The model is designed to be CPU-efficient.
 - The submission is built for validation and compliance.
 - The project is suitable for Artixcore's AI trading portfolio.
-- The work is authored by Ismam Tabriz and his Agent.
+- Local venv development setup is documented (`requirements.txt`, `run_local.py`, `predictor.py` stub).
+- AlphaNova official runner validation is the next gate before submission.
 
 ---
 
@@ -420,3 +562,108 @@ alphalab
 ai-trading-research
 portfolio-project
 ```
+
+---
+
+## 19. ChatGPT / AI Assistant Context
+
+Copy the block below into ChatGPT (or another AI assistant) to continue development with accurate project context.
+
+```text
+PROJECT: Artixcore AlphaLab v0.1
+AUTHOR: Ismam Tabriz
+ORG: Artixcore
+COMPETITION: AlphaNova Competition 5 — Walk-Forward Cross-Sectional Signal Forecasting
+URL: https://www.alphanova.tech/competition/competition-5
+
+GOAL:
+Build a leakage-safe cross-sectional signal forecasting Predictor for AlphaNova.
+Submit ONLY artixcore_alphalab_v01.py. All model logic must stay inside the Predictor subclass.
+
+MAIN CLASS:
+- File: artixcore_alphalab_v01.py
+- Class: ArtixcoreAlphaLabPredictor(Predictor)
+- Methods: train(features, target), predict(features)
+- Model: Ridge regression (alpha=8.0), CPU-efficient, max_train_rows=250_000
+- Output: pandas DataFrame, rows=timestamps, columns=assets, cross-sectionally de-meaned per row
+
+DATA SHAPE:
+- Features: panel DataFrame with MultiIndex columns (feature_name, ticker) or simple ticker columns
+- Target: aligned DataFrame/Series for training only (never used in predict)
+
+LOCAL DEV FILES (not submitted):
+- requirements.txt → numpy>=2.0, pandas>=2.2
+- predictor.py → local Predictor stub (AlphaNova provides the real module)
+- run_local.py → synthetic smoke test
+- .venv/ → virtual environment
+
+LOCAL RUN (Git Bash on Windows):
+  cd artixcore-alphalab
+  python -m venv .venv
+  source .venv/Scripts/activate
+  pip install -r requirements.txt
+  python run_local.py
+
+OFFICIAL VALIDATION (AlphaNova toolkit):
+  python runner.py artixcore_alphalab_v01.py
+  python runner.py artixcore_alphalab_v01.py --full
+  python runner.py artixcore_alphalab_v01.py --gauge-fix
+
+COMPLIANCE RULES:
+- No external data
+- No future-looking ops (no shift(-1), bfill, centered rolling)
+- No target in predict()
+- No helper functions or extra classes outside the Predictor subclass in the submission file
+- Handle NaN/inf safely
+- Cross-sectionally de-mean every prediction row
+
+CURRENT STATUS:
+- Local venv smoke test passes (is_trained_=True, prediction shape verified)
+- Next: run AlphaNova official runner, then submit artixcore_alphalab_v01.py
+
+WHEN HELPING ME:
+- Prefer minimal, focused diffs in artixcore_alphalab_v01.py only for submission changes
+- Keep leakage-safety and competition compliance as top priorities
+- Do not add external data sources or complexity without CPU/time justification
+```
+
+### 19.1 Submission entry point (reference)
+
+```python
+import numpy as np
+import pandas as pd
+
+from predictor import Predictor
+
+
+class ArtixcoreAlphaLabPredictor(Predictor):
+    """
+    Artixcore AlphaLab v0.1
+    Leakage-safe walk-forward cross-sectional signal forecasting baseline.
+    """
+
+    def __init__(self):
+        try:
+            super().__init__()
+        except TypeError:
+            pass
+
+        self.alpha = 8.0
+        self.coef_ = None
+        self.intercept_ = 0.0
+        self.x_mean_ = None
+        self.x_scale_ = None
+        self.feature_columns_ = None
+        self.prediction_clip_ = 1.0
+        self.is_trained_ = False
+        self.max_train_rows = 250_000
+        self.training_error_ = None
+
+    def train(self, features, target):
+        ...
+
+    def predict(self, features):
+        ...
+```
+
+The full implementation lives in `artixcore_alphalab_v01.py` (~500 lines). Ask the assistant to read or patch that file rather than duplicating helpers outside the class.
