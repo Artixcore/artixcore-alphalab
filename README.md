@@ -3,10 +3,10 @@
 **Leakage-Safe Walk-Forward Cross-Sectional Signal Forecasting Model**
 
 Author: **Ismam Tabriz**  
-Built with: **His Agent**  
+Built with: **ALI 1.0.0**  
 Organization: **Artixcore**  
 Project Type: **AI / Quant Research / Machine Learning Competition Prototype**  
-Competition Target: **AlphaNova Competition 5 — Walk-Forward Cross-Sectional Signal Forecasting**  
+Competition Target: **AlphaNova Competition 5  Walk-Forward Cross-Sectional Signal Forecasting**  
 Status: **Portfolio-grade research prototype**
 
 ---
@@ -383,7 +383,7 @@ Any trading or investment decision involves risk. The project should be understo
 ## 15. Credits
 
 **Author:** Ismam Tabriz  
-**AI / Research Partner:** His Agent  
+**AI / Research Partner:** ALI 1.0 Agent  
 **Brand / Organization:** Artixcore  
 **Project:** Artixcore AlphaLab v0.1  
 **Domain:** AI, Quant Research, Signal Forecasting, Machine Learning, Financial Engineering
@@ -401,7 +401,7 @@ Any trading or investment decision involves risk. The project should be understo
 ## 17. Suggested Repository Short Description
 
 ```text
-Artixcore AlphaLab v0.1 — A leakage-safe walk-forward cross-sectional signal forecasting model built by Ismam Tabriz and his Agent for AlphaNova's AI/quant competition.
+Artixcore AlphaLab v0.1  A leakage-safe walk-forward cross-sectional signal forecasting model built by Ismam Tabriz and his Agent for AlphaNova's AI/quant competition.
 ```
 
 ---
