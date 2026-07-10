@@ -6,15 +6,15 @@ from predictor import Predictor
 
 
 class ArtixcoreAlphaLabPredictor(Predictor):
-    """
-    Artixcore AlphaLab v0.2
-    Hybrid leakage-safe walk-forward cross-sectional signal forecaster.
-
-    Ridge + Huber + rank linear ensemble blended with conservative XGBoost.
-    Chronological timestamp validation with lag-aware Sharpe model selection.
-    """
+ 
+    # Artixcore AlphaLab v0.3
+    # Hybrid leakage-safe walk-forward cross-sectional signal forecaster.
+    # Ridge + Huber + rank linear ensemble blended with conservative XGBoost.
+    # Recency-weighted training with stability-aware chronological validation.
 
     _ALPHA_CANDIDATES = (2.0, 4.0, 8.0, 16.0, 32.0)
+    _DECAY_CANDIDATES = (0.12, 0.20, 0.30, 0.45)
+    _DEFAULT_DECAY = 0.20
     _ENSEMBLE_PRESETS = (
         {"linear": 0.00, "xgb": 1.00, "rank": 0.00},
         {"linear": 0.25, "xgb": 0.70, "rank": 0.05},
@@ -74,6 +74,8 @@ class ArtixcoreAlphaLabPredictor(Predictor):
         self.fallback_used_ = False
         self.use_rank_blend_ = False
         self.rank_blend_weight_ = 0.25
+        self.decay_fraction_ = self._DEFAULT_DECAY
+        self.selected_decay_ = self._DEFAULT_DECAY
 
     def _infer_column_levels(self, columns):
         if not isinstance(columns, pd.MultiIndex):
@@ -617,6 +619,114 @@ class ArtixcoreAlphaLabPredictor(Predictor):
         flat_penalty = 0.5 if row_std.median() < 1e-8 else 0.0
         return lag_sh + 0.25 * ic_mean - 0.15 * ic_std - flat_penalty
 
+    def _unique_timestamps(self, index):
+        if isinstance(index, pd.MultiIndex):
+            return pd.unique(index.get_level_values(0))
+        return pd.unique(index)
+
+    def _mask_by_timestamps(self, index, timestamps):
+        ts_set = set(timestamps)
+        if isinstance(index, pd.MultiIndex):
+            return index.get_level_values(0).isin(ts_set)
+        return index.isin(ts_set)
+
+    def _per_timestamp_ics(self, y_long, pred_long):
+        if isinstance(pred_long, pd.Series):
+            pred_arr = pred_long.reindex(y_long.index).to_numpy(dtype=np.float64)
+        else:
+            pred_arr = np.asarray(pred_long, dtype=np.float64)
+
+        aligned = pd.concat(
+            [y_long.rename("y"), pd.Series(pred_arr, index=y_long.index).rename("p")],
+            axis=1,
+        ).dropna()
+        if aligned.empty:
+            return []
+
+        corrs = []
+        if isinstance(aligned.index, pd.MultiIndex):
+            grouped = aligned.groupby(level=0)
+
+            def _block_corr(g):
+                if len(g) < 3:
+                    return np.nan
+                yv, pv = g["y"].values, g["p"].values
+                if np.nanstd(yv) < 1e-12 or np.nanstd(pv) < 1e-12:
+                    return np.nan
+                c = np.corrcoef(yv, pv)[0, 1]
+                return c if np.isfinite(c) else np.nan
+
+            corrs = grouped.apply(_block_corr, include_groups=False).dropna().tolist()
+        else:
+            c = np.corrcoef(aligned["y"], aligned["p"])[0, 1]
+            if np.isfinite(c):
+                corrs.append(float(c))
+        return corrs
+
+    def _stability_aware_score(self, pred_long, y_long, assets):
+        if isinstance(pred_long, pd.Series):
+            pred_arr = pred_long.reindex(y_long.index).to_numpy(dtype=np.float64)
+        else:
+            pred_arr = np.asarray(pred_long, dtype=np.float64)
+
+        val_score = self._validation_score(pred_arr, y_long, assets)
+        unique_ts = self._unique_timestamps(y_long.index)
+        n_ts = len(unique_ts)
+
+        recent_sh = -1.0
+        recent_ic = -1.0
+        if n_ts >= 3:
+            recent_start = max(0, int(n_ts * 0.70))
+            recent_ts = unique_ts[recent_start:]
+            recent_mask = self._mask_by_timestamps(y_long.index, recent_ts)
+            recent_y = y_long.loc[recent_mask]
+            recent_pred = pred_arr[recent_mask]
+            if len(recent_y) >= 10:
+                recent_sh = self._lag_sharpe_from_long(recent_pred, recent_y, assets)
+                recent_ic, _ = self._cross_sectional_ic_score(recent_y, recent_pred)
+
+        block_ics = self._per_timestamp_ics(y_long, pred_arr)
+        pos_block_rate = float(np.mean(np.asarray(block_ics) > 0)) if block_ics else 0.0
+
+        subblock_means = []
+        if n_ts >= 4:
+            for i in range(4):
+                start = i * n_ts // 4
+                end = (i + 1) * n_ts // 4 if i < 3 else n_ts
+                block_ts = unique_ts[start:end]
+                block_mask = self._mask_by_timestamps(y_long.index, block_ts)
+                block_y = y_long.loc[block_mask]
+                block_pred = pred_arr[block_mask]
+                if len(block_y) >= 10:
+                    ic_block, _ = self._cross_sectional_ic_score(block_y, block_pred)
+                    if np.isfinite(ic_block):
+                        subblock_means.append(ic_block)
+        subblock_ic_std = float(np.std(subblock_means)) if len(subblock_means) > 1 else 0.0
+
+        pred_matrix = self._long_preds_to_matrix(
+            pd.Series(pred_arr, index=y_long.index), y_long.index, assets
+        )
+        row_std = pred_matrix.std(axis=1, ddof=0)
+        pred_var_median = float(row_std.median()) if len(row_std) else 0.0
+        flat_penalty = 0.5 if pred_var_median < 1e-8 else 0.0
+
+        score = (
+            0.30 * val_score
+            + 0.25 * recent_sh
+            + 0.20 * recent_ic
+            + 0.10 * pos_block_rate
+            + 0.05 * np.log(pred_var_median + 1e-8)
+            - 0.15 * subblock_ic_std
+            - flat_penalty
+        )
+        metrics = {
+            "recent_ic": recent_ic,
+            "recent_sh": recent_sh,
+            "pos_block_rate": pos_block_rate,
+            "subblock_ic_std": subblock_ic_std,
+        }
+        return float(score), metrics
+
     def _ensemble_predict_long(self, x_data, coef_p, int_p, coef_h, int_h, coef_r, int_r, weights):
         pred = np.zeros(len(x_data), dtype=np.float64)
         w_lin = weights.get("linear", 0.55)
@@ -651,13 +761,23 @@ class ArtixcoreAlphaLabPredictor(Predictor):
 
         return x_train.iloc[positions], y_train.iloc[positions], positions
 
-    def _compute_sample_weights(self, positions, total_rows):
+    def _compute_sample_weights(self, positions, total_rows, decay_fraction=None):
+        if decay_fraction is None:
+            decay_fraction = self._DEFAULT_DECAY
         if total_rows <= 1:
             return np.ones(len(positions), dtype=np.float64)
         ages = (total_rows - 1) - positions.astype(np.float64)
-        halflife = max(1.0, total_rows * 0.25)
+        halflife = max(1.0, total_rows * decay_fraction)
         weights = np.exp(-ages / halflife)
         return (weights / np.mean(weights)).astype(np.float64)
+
+    def _weights_for_subsampled_panel(self, x_sub, total_rows, decay_fraction=None):
+        n_rows = len(x_sub)
+        if n_rows >= total_rows:
+            positions = np.arange(n_rows, dtype=np.int64)
+        else:
+            positions = np.linspace(0, total_rows - 1, n_rows, dtype=np.int64)
+        return self._compute_sample_weights(positions, total_rows, decay_fraction)
 
     def _subsample_long_panel(self, x_long, y_long, max_rows=None):
         max_rows = max_rows or self.max_val_rows
@@ -667,7 +787,7 @@ class ArtixcoreAlphaLabPredictor(Predictor):
         positions = np.linspace(0, n_rows - 1, max_rows, dtype=np.int64)
         return x_long.iloc[positions], y_long.iloc[positions]
 
-    def _select_alpha(self, x_early, y_early, x_late, y_late, assets):
+    def _select_alpha(self, x_early, y_early, x_late, y_late, assets, decay_fraction=None):
         x_e, y_e = self._subsample_long_panel(x_early, y_early)
         x_l, y_l = self._subsample_long_panel(x_late, y_late)
         best_alpha = 8.0
@@ -682,7 +802,7 @@ class ArtixcoreAlphaLabPredictor(Predictor):
         return best_alpha, best_score
 
     def _select_ensemble_weights(
-        self, x_early, y_early, x_late, y_late, assets, alpha, xgb_model
+        self, x_early, y_early, x_late, y_late, assets, alpha, xgb_model, decay_fraction=None
     ):
         x_e, y_e = self._subsample_long_panel(x_early, y_early)
         x_l, y_l = self._subsample_long_panel(x_late, y_late)
@@ -708,6 +828,37 @@ class ArtixcoreAlphaLabPredictor(Predictor):
 
         self.xgb_model_ = saved_xgb
         return best_weights, best_score
+
+    def _select_decay_strength(self, x_early, y_early, x_late, y_late, assets, alpha):
+        x_e, y_e = self._subsample_long_panel(x_early, y_early, max_rows=15_000)
+        x_l, y_l = self._subsample_long_panel(x_late, y_late, max_rows=10_000)
+        n_early = len(x_early)
+
+        candidates = []
+        for decay in self._DECAY_CANDIDATES:
+            fit_weights = self._weights_for_subsampled_panel(x_e, n_early, decay)
+            coef, intercept = self._fit_ridge_core(x_e, y_e, alpha, fit_weights)
+            preds = self._predict_linear(x_l, coef, intercept)
+            score, metrics = self._stability_aware_score(preds, y_l, assets)
+            candidates.append((decay, score, metrics))
+
+        best_recent_ic = max(m["recent_ic"] for _, _, m in candidates)
+        best_recent_sh = max(m["recent_sh"] for _, _, m in candidates)
+
+        best_decay = self._DEFAULT_DECAY
+        best_score = -np.inf
+        for decay, score, metrics in candidates:
+            penalty = 0.0
+            if metrics["recent_ic"] < best_recent_ic - 0.05:
+                penalty += 0.10
+            if metrics["recent_sh"] < best_recent_sh - 0.05:
+                penalty += 0.10
+            adj_score = score - penalty
+            if adj_score > best_score:
+                best_score = adj_score
+                best_decay = decay
+
+        return best_decay, best_score
 
     def _zero_prediction(self, features):
         _, assets = self._extract_feature_frames(features)
@@ -798,20 +949,35 @@ class ArtixcoreAlphaLabPredictor(Predictor):
             self.selected_alpha_ = selected_alpha
             self.selected_params_ = {"alpha": selected_alpha}
 
-            xgb_early = self._fit_xgb(
-                *self._subsample_long_panel(x_early, y_early)
-            )
+            x_e_sub, y_e_sub = self._subsample_long_panel(x_early, y_early)
+            xgb_early = self._fit_xgb(x_e_sub, y_e_sub)
+
             if len(x_late):
                 tuned_weights, val_score = self._select_ensemble_weights(
-                    x_early, y_early, x_late, y_late, assets, selected_alpha, xgb_early
+                    x_early,
+                    y_early,
+                    x_late,
+                    y_late,
+                    assets,
+                    selected_alpha,
+                    xgb_early,
                 )
                 self.model_weights_ = tuned_weights
-                self.validation_score_ = val_score
+                selected_decay, decay_score = self._select_decay_strength(
+                    x_early, y_early, x_late, y_late, assets, selected_alpha
+                )
+                self.decay_fraction_ = selected_decay
+                self.selected_decay_ = selected_decay
+                self.validation_score_ = decay_score if decay_score > val_score else val_score
             else:
+                self.decay_fraction_ = self._DEFAULT_DECAY
+                self.selected_decay_ = self._DEFAULT_DECAY
                 self.validation_score_ = alpha_score
 
             x_sampled, y_sampled, positions = self._sample_training_rows(x_all_f, y_all)
-            sample_weights = self._compute_sample_weights(positions, len(x_all_f))
+            sample_weights = self._compute_sample_weights(
+                positions, len(x_all_f), self.decay_fraction_
+            )
             self.training_rows_ = len(x_sampled)
 
             abs_y = np.abs(y_sampled.to_numpy(dtype=np.float64, copy=False))
