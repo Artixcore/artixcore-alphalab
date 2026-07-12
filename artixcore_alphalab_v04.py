@@ -6,7 +6,6 @@ import xgboost as xgb
 
 from predictor import Predictor
 
-
 class ArtixcoreAlphaLabPredictor(Predictor):
     """Artixcore AlphaLab v0.4, lightweight regime-aware ensemble."""
 
