@@ -8,7 +8,7 @@ from predictor import Predictor
 
 class ArtixcoreAlphaLabPredictor(Predictor):
     """Arixcore AlphaLab v0.4, lightweight regime-aware ensemble."""
-
+    
     _ALPHA = 8.0
     _FAST_DECAY = 0.12
     _SLOW_DECAY = 0.45
