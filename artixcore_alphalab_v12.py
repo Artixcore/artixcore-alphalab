@@ -1,20 +1,16 @@
 import time
-
 import numpy as np
 import pandas as pd
 import xgboost as xgb
-
 from predictor import Predictor
 
 
 class ArtixcoreAlphaLabPredictor(Predictor):
-    """Artixcore AlphaLab v0.12, holdout-calibrated robust residual ensemble."""
+    """Artixcore AlphaLab v0.12, leaderboard-hardened v0.8 core."""
 
-    _RIDGE_ALPHA = 8.0
-    _RANK_ALPHA = 20.0
+    _ALPHA = 8.0
     _DECAY = 0.20
-    _HUBER_C = 1.50
-
-    # raw, rank, residual, output-rank blend
-    _BLEND_PRESETS = (
-        (0.88, 0.12, 
+    _RIDGE_WEIGHT = 0.75
+    _XGB_WEIGHT = 0.25
+    _PRIORITY = (
+        "Feature.1__raw
