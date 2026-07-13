@@ -6,9 +6,8 @@ import xgboost as xgb
 
 from predictor import Predictor
 
-
 class ArtixcoreAlphaLabPredictor(Predictor):
-    """Artixcore AlphaLab v0.10, robust agreement-gated residual ensemble."""
+    # Artixcore AlphaLab v0.10, robust agreement-gated residual ensemble.
 
     _RIDGE_ALPHA = 8.0
     _STABLE_ALPHA = 24.0
