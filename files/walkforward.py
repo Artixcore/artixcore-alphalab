@@ -105,7 +105,7 @@ def walkforward_full(
             )
             fixed = compute_gauge_fixed(prediction.to_numpy(), gauges)
             prediction = pd.DataFrame(
-                np.einsum("tji,ti->tj", gauges, fixed),
+                np.einsum("tij,ti->tj", gauges, fixed),
                 index=prediction.index,
                 columns=prediction.columns,
             )
