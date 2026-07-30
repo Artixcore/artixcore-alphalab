@@ -1,0 +1,47 @@
+name: AlphaLab Diagnostics
+
+on:
+  push:
+    branches: [master]
+    paths:
+      - "research/diagnose_v33_v42.py"
+      - "artixcore_alphalab_v33.py"
+      - "artixcore_alphalab_v42.py"
+      - ".github/workflows/alphalab-diagnostics.yml"
+  workflow_dispatch:
+
+jobs:
+  diagnose:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: files/requirements.txt
+
+      - name: Install dependencies
+        run: python -m pip install -r files/requirements.txt
+
+      - name: Compile models and diagnostics
+        run: |
+          python -m py_compile artixcore_alphalab_v33.py
+          python -m py_compile artixcore_alphalab_v42.py
+          python -m py_compile research/diagnose_v33_v42.py
+
+      - name: Run period diagnostics
+        run: python research/diagnose_v33_v42.py
+
+      - name: Upload diagnostic tables
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: alphalab-period-diagnostics
+          path: research/output/
+          if-no-files-found: error
+          retention-days: 14
