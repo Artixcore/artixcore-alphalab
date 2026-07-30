@@ -18,7 +18,7 @@ on:
 jobs:
   diagnose:
     runs-on: ubuntu-latest
-    timeout-minutes: 30
+    timeout-minutes: 40
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -39,6 +39,7 @@ jobs:
           python -m py_compile artixcore_alphalab_v42.py
           python -m py_compile research/diagnose_v33_v42.py
           python -m py_compile research/evaluate_v43_candidates.py
+          python -m py_compile research/evaluate_v43_holdout.py
 
       - name: Run period diagnostics
         run: python research/diagnose_v33_v42.py
@@ -46,11 +47,14 @@ jobs:
       - name: Run v43 development candidates
         run: python research/evaluate_v43_candidates.py
 
+      - name: Run frozen v43 holdout
+        run: python research/evaluate_v43_holdout.py
+
       - name: Upload research tables
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: alphalab-v43-development
+          name: alphalab-v43-research
           path: research/output/
           if-no-files-found: error
           retention-days: 14
