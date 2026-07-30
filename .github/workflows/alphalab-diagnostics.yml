@@ -1,4 +1,4 @@
-name: AlphaLab Diagnostics
+name: AlphaLab v43 Final Validation
 
 on:
   pull_request:
@@ -9,23 +9,74 @@ on:
       - ".github/workflows/alphalab-diagnostics.yml"
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
-  diagnose:
+  validate-v43:
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 30
     steps:
-      - name: Checkout
+      - name: Checkout research branch
         uses: actions/checkout@v4
+        with:
+          ref: research/alphalab-diagnostics-run
+          fetch-depth: 0
 
-      - name: Export v33 source
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: files/requirements.txt
+
+      - name: Install dependencies
+        run: python -m pip install -r files/requirements.txt
+
+      - name: Build standalone v43
+        run: python research/build_v43_standalone.py
+
+      - name: Compile v43 and validation
         run: |
-          mkdir -p research/output/source
-          cp artixcore_alphalab_v33.py research/output/source/
+          python -m py_compile artixcore_alphalab_v43.py
+          python -m py_compile research/validate_v43_standalone.py
 
-      - name: Upload v33 source
+      - name: Run final promotion gates
+        run: python research/validate_v43_standalone.py
+
+      - name: Prepare validated files
+        run: |
+          mkdir -p /tmp/v43-final/research/v43_validation
+          cp artixcore_alphalab_v43.py /tmp/v43-final/
+          cp research/v43_research_report.md /tmp/v43-final/research/
+          cp research/output/v43_final/seed_results.csv /tmp/v43-final/research/v43_validation/
+          cp research/output/v43_final/fold_results.csv /tmp/v43-final/research/v43_validation/
+          cp research/output/v43_final/validation_summary.json /tmp/v43-final/research/v43_validation/
+
+      - name: Publish validated v43 branch
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git fetch origin master
+          git switch -C v43-final origin/master
+          cp /tmp/v43-final/artixcore_alphalab_v43.py .
+          mkdir -p research/v43_validation
+          cp /tmp/v43-final/research/v43_research_report.md research/
+          cp /tmp/v43-final/research/v43_validation/* research/v43_validation/
+          git add artixcore_alphalab_v43.py research/v43_research_report.md research/v43_validation/
+          git commit -m "Add validated AlphaLab v43 core-anchor challenger"
+          git push --force-with-lease origin v43-final
+
+      - name: Upload final validation artifact
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: alphalab-v33-source
-          path: research/output/source/
+          name: alphalab-v43-final-validation
+          path: |
+            artixcore_alphalab_v43.py
+            research/v43_research_report.md
+            research/output/v43_final/
           if-no-files-found: error
-          retention-days: 1
+          retention-days: 14
