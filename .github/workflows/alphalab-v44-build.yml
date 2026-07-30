@@ -6,6 +6,11 @@ on:
     paths:
       - "research/build_v44.py"
       - ".github/workflows/alphalab-v44-build.yml"
+  pull_request:
+    branches: [master]
+    paths:
+      - "research/build_v44.py"
+      - ".github/workflows/alphalab-v44-build.yml"
   workflow_dispatch:
 
 permissions:
