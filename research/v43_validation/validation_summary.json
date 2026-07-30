@@ -1,0 +1,96 @@
+{
+  "decision": "promote_experimental_challenger",
+  "development_seeds": [
+    1729,
+    3141,
+    5003,
+    7919,
+    12007
+  ],
+  "holdout_seeds": [
+    18013,
+    24023,
+    32027
+  ],
+  "architecture_frozen_before_holdout": true,
+  "engineering": {
+    "compiled": true,
+    "forbidden_patterns": 0,
+    "trained": true,
+    "core_enabled": true,
+    "selected_features": 29,
+    "core_features": 11,
+    "finite": true,
+    "shape_preserved": true,
+    "index_preserved": true,
+    "columns_preserved": true,
+    "max_row_mean": 1.0430812658057675e-08,
+    "deterministic_max_diff": 0.0,
+    "future_causality_max_diff": 0.0,
+    "fallback": false,
+    "base_core_corr_smoke": 0.9940721134648038,
+    "insufficient_data_error": "Insufficient usable training observations"
+  },
+  "reference_equivalence": {
+    "max_prediction_diff": 0.0,
+    "mean_prediction_diff": 0.0
+  },
+  "development": {
+    "seeds": 5,
+    "sharpe_delta_mean": 0.006899265873263616,
+    "sharpe_delta_median": 0.006097682150347339,
+    "sharpe_wins": 5,
+    "ic_delta_mean": 0.0015821447611352514,
+    "ic_delta_median": 0.0017527585196758233,
+    "ic_wins": 5,
+    "worst_seed_sharpe_delta": 0.004915038174990727,
+    "worst_fold_sharpe_delta_median": 0.0051725823732966525,
+    "mean_prediction_corr_v33": 0.9994509391581745,
+    "max_concentration": 0.07076490070358064,
+    "mean_train_runtime_ratio": 1.7755733470522277,
+    "mean_predict_runtime_ratio": 1.9733590649230401,
+    "fallback_periods": 0,
+    "failures": 0
+  },
+  "holdout": {
+    "seeds": 3,
+    "sharpe_delta_mean": 0.006635262862437615,
+    "sharpe_delta_median": 0.007032258698386418,
+    "sharpe_wins": 3,
+    "ic_delta_mean": 0.001575773850209942,
+    "ic_delta_median": 0.0016410750903232962,
+    "ic_wins": 3,
+    "worst_seed_sharpe_delta": 0.0058281745254120665,
+    "worst_fold_sharpe_delta_median": 0.00578944453752861,
+    "mean_prediction_corr_v33": 0.9994763327606492,
+    "max_concentration": 0.07056654144856607,
+    "mean_train_runtime_ratio": 1.7690440984316966,
+    "mean_predict_runtime_ratio": 1.9961252957204163,
+    "fallback_periods": 0,
+    "failures": 0
+  },
+  "all": {
+    "seeds": 8,
+    "sharpe_wins": 8,
+    "ic_wins": 8,
+    "worst_seed_sharpe_delta": 0.004915038174990727,
+    "mean_prediction_corr_v33": 0.9994604617591025,
+    "max_concentration": 0.07076490070358064,
+    "fallback_periods": 0,
+    "failures": 0
+  },
+  "gates": {
+    "development_median_sharpe_positive": true,
+    "development_median_ic_positive": true,
+    "development_sharpe_wins_4_of_5": true,
+    "holdout_median_sharpe_positive": true,
+    "holdout_median_ic_positive": true,
+    "worst_seed_not_worse": true,
+    "concentration_controlled": true,
+    "no_fallback": true,
+    "no_failures": true,
+    "reference_equivalent": true,
+    "correlation_gate_or_stability_exception": true
+  },
+  "stable_correlation_exception": true
+}
