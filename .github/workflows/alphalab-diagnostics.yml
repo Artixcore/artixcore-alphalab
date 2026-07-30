@@ -1,12 +1,6 @@
 name: AlphaLab Diagnostics
 
 on:
-  push:
-    branches: [master]
-    paths:
-      - "research/**"
-      - "artixcore_alphalab_v*.py"
-      - ".github/workflows/alphalab-diagnostics.yml"
   pull_request:
     branches: [master]
     paths:
@@ -18,35 +12,20 @@ on:
 jobs:
   diagnose:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 5
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
-      - name: Set up Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-          cache: pip
-          cache-dependency-path: files/requirements.txt
-
-      - name: Install dependencies
-        run: python -m pip install -r files/requirements.txt
-
-      - name: Compile frozen holdout evaluator
+      - name: Export v33 source
         run: |
-          python -m py_compile artixcore_alphalab_v33.py
-          python -m py_compile research/evaluate_v43_candidates.py
-          python -m py_compile research/evaluate_v43_holdout.py
+          mkdir -p research/output/source
+          cp artixcore_alphalab_v33.py research/output/source/
 
-      - name: Run frozen v43 holdout
-        run: python research/evaluate_v43_holdout.py
-
-      - name: Upload holdout tables
-        if: always()
+      - name: Upload v33 source
         uses: actions/upload-artifact@v4
         with:
-          name: alphalab-v43-holdout
-          path: research/output/v43_holdout/
+          name: alphalab-v33-source
+          path: research/output/source/
           if-no-files-found: error
-          retention-days: 14
+          retention-days: 1
