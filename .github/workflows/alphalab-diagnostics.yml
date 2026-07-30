@@ -4,9 +4,8 @@ on:
   push:
     branches: [master]
     paths:
-      - "research/diagnose_v33_v42.py"
-      - "artixcore_alphalab_v33.py"
-      - "artixcore_alphalab_v42.py"
+      - "research/**"
+      - "artixcore_alphalab_v*.py"
       - ".github/workflows/alphalab-diagnostics.yml"
   pull_request:
     branches: [master]
@@ -19,7 +18,7 @@ on:
 jobs:
   diagnose:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 30
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -34,20 +33,24 @@ jobs:
       - name: Install dependencies
         run: python -m pip install -r files/requirements.txt
 
-      - name: Compile models and diagnostics
+      - name: Compile models and research scripts
         run: |
           python -m py_compile artixcore_alphalab_v33.py
           python -m py_compile artixcore_alphalab_v42.py
           python -m py_compile research/diagnose_v33_v42.py
+          python -m py_compile research/evaluate_v43_candidates.py
 
       - name: Run period diagnostics
         run: python research/diagnose_v33_v42.py
 
-      - name: Upload diagnostic tables
+      - name: Run v43 development candidates
+        run: python research/evaluate_v43_candidates.py
+
+      - name: Upload research tables
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: alphalab-period-diagnostics
+          name: alphalab-v43-development
           path: research/output/
           if-no-files-found: error
           retention-days: 14
