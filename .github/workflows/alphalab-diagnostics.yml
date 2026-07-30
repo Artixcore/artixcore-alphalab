@@ -8,6 +8,12 @@ on:
       - "artixcore_alphalab_v33.py"
       - "artixcore_alphalab_v42.py"
       - ".github/workflows/alphalab-diagnostics.yml"
+  pull_request:
+    branches: [master]
+    paths:
+      - "research/**"
+      - "artixcore_alphalab_v*.py"
+      - ".github/workflows/alphalab-diagnostics.yml"
   workflow_dispatch:
 
 jobs:
